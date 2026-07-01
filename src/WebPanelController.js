@@ -81,8 +81,15 @@ var __MN_WEB_API_MNCardsToMDAddon = (function () {
       error: error === undefined ? null : error,
     };
 
-    const script = `window.__MNBridgeReceive_MNCardsToMDAddon('${encodeBridgeJSON(response)}')`;
-    evaluateScript(webView, script);
+    console.log(
+      `[WebAddon] bridge response start: requestId=${requestId}, error=${error ? error.message || "yes" : "none"}`,
+    );
+    try {
+      const script = `window.__MNBridgeReceive_MNCardsToMDAddon('${encodeBridgeJSON(response)}')`;
+      evaluateScript(webView, script);
+    } finally {
+      console.log(`[WebAddon] bridge response end: requestId=${requestId}`);
+    }
   }
 
   function normalizeBridgeError(error, command) {
@@ -187,6 +194,9 @@ var __MN_WEB_API_MNCardsToMDAddon = (function () {
     controller.view.hidden = true;
     if (controller.view.superview) {
       controller.view.removeFromSuperview();
+    }
+    if (controller.addon) {
+      controller.addon._cardsToMDPreviewSnapshot = null;
     }
     NSUserDefaults.standardUserDefaults().setObjectForKey(false, PANEL_ON_KEY);
 
@@ -586,20 +596,33 @@ var __MN_WEB_API_MNCardsToMDAddon = (function () {
         }
 
         const message = decodeBridgeMessage(url);
-        const result = dispatchBridgeCommand(self, message);
+        const requestId = message.requestId;
+        const command = message.command;
 
-        if (isPromiseLike(result)) {
-          result.then(function (payload) {
-            sendBridgeResponse(webView, message.requestId, payload, null);
-          }).catch(function (error) {
-            const bridgeError = normalizeBridgeError(error, message.command);
-            sendBridgeResponse(webView, message.requestId, null, bridgeError);
-            console.log(`[WebAddon] bridge error: ${bridgeError.message}`);
-          });
-          return false;
+        try {
+          const result = dispatchBridgeCommand(self, message);
+
+          if (isPromiseLike(result)) {
+            result.then(function (payload) {
+              sendBridgeResponse(webView, requestId, payload, null);
+            }).catch(function (error) {
+              const bridgeError = normalizeBridgeError(error, command);
+              sendBridgeResponse(webView, requestId, null, bridgeError);
+              console.log(
+                `[WebAddon] bridge error: command=${command}, requestId=${requestId}, message=${bridgeError.message}`,
+              );
+            });
+            return false;
+          }
+
+          sendBridgeResponse(webView, requestId, result, null);
+        } catch (error) {
+          const bridgeError = normalizeBridgeError(error, command);
+          sendBridgeResponse(webView, requestId, null, bridgeError);
+          console.log(
+            `[WebAddon] bridge error: command=${command}, requestId=${requestId}, message=${bridgeError.message}`,
+          );
         }
-
-        sendBridgeResponse(webView, message.requestId, result, null);
         return false;
       } catch (error) {
         const bridgeError = normalizeBridgeError(error, "unknown");

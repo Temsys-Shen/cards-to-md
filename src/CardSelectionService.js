@@ -43,16 +43,6 @@ var __MN_CARD_SELECTION_SERVICE_MNCardsToMDAddon = (function () {
     return result;
   }
 
-  function resolveNode(selectionItem) {
-    if (!selectionItem) return null;
-    if (selectionItem.note && selectionItem.note.note) return selectionItem.note;
-    if (selectionItem.noteId || selectionItem.comments || selectionItem.excerptText) return {
-      note: selectionItem,
-      frame: selectionItem.frame || { x: 0, y: 0 },
-    };
-    return selectionItem.note || selectionItem;
-  }
-
   function numberOrZero(value) {
     const number = Number(value);
     return Number.isFinite(number) ? number : 0;
@@ -63,41 +53,160 @@ var __MN_CARD_SELECTION_SERVICE_MNCardsToMDAddon = (function () {
     return numberOrZero(frame[key]);
   }
 
-  function getSelectedCards(context) {
-    const items = arrayFromNSArray(getSelectedViews(context));
-    const seen = {};
-    const cards = [];
+  function resolveNode(selectionItem) {
+    if (!selectionItem) return null;
+    if (selectionItem.note && selectionItem.note.note) return selectionItem.note;
+    if (selectionItem.note && selectionItem.note.noteId) return selectionItem;
+    if (selectionItem.noteId || selectionItem.comments || selectionItem.excerptText) {
+      return {
+        note: selectionItem,
+        parentNode: selectionItem.parentNode,
+        childNodes: selectionItem.childNodes,
+        frame: selectionItem.frame || { x: 0, y: 0 },
+      };
+    }
+    return selectionItem.note || selectionItem;
+  }
+
+  function getVisualOrderKey(node) {
+    return [node.y, node.x, node.selectionIndex];
+  }
+
+  function compareByVisualOrder(left, right) {
+    const leftKey = getVisualOrderKey(left);
+    const rightKey = getVisualOrderKey(right);
+    for (let index = 0; index < leftKey.length; index += 1) {
+      if (leftKey[index] !== rightKey[index]) {
+        return leftKey[index] - rightKey[index];
+      }
+    }
+    return 0;
+  }
+
+  function buildSelectedNode(node, selectionIndex) {
+    const note = node && node.note ? node.note : null;
+    if (!note || !note.noteId) return null;
+
+    const frame = node.frame || {};
+    const parentNode = node.parentNode || null;
+    const childNodes = arrayFromNSArray(node.childNodes);
+
+    return {
+      note,
+      noteId: note.noteId,
+      selectionIndex,
+      x: getFrameValue(frame, "x"),
+      y: getFrameValue(frame, "y"),
+      parentNoteId: parentNode && parentNode.note ? parentNode.note.noteId : null,
+      childNoteIds: childNodes.map(function (childNode) {
+        return childNode && childNode.note ? childNode.note.noteId : null;
+      }).filter(Boolean),
+    };
+  }
+
+  function indexSelectedNodes(items) {
+    const selectedById = {};
+    const orderedNodes = [];
 
     items.forEach(function (item, selectionIndex) {
       const node = resolveNode(item);
-      const note = node && node.note ? node.note : null;
-      if (!note || !note.noteId) return;
-      if (seen[note.noteId]) return;
+      const selectedNode = buildSelectedNode(node, selectionIndex);
+      if (!selectedNode) return;
+      if (selectedById[selectedNode.noteId]) return;
 
-      seen[note.noteId] = true;
-      const frame = node.frame || item.frame || {};
-      cards.push({
-        note,
-        selectionIndex,
-        x: getFrameValue(frame, "x"),
-        y: getFrameValue(frame, "y"),
-      });
+      selectedById[selectedNode.noteId] = selectedNode;
+      orderedNodes.push(selectedNode);
     });
 
-    cards.sort(function (left, right) {
-      if (left.y !== right.y) return left.y - right.y;
-      if (left.x !== right.x) return left.x - right.x;
-      return left.selectionIndex - right.selectionIndex;
-    });
-
-    if (cards.length === 0) {
+    orderedNodes.sort(compareByVisualOrder);
+    if (orderedNodes.length === 0) {
       throw new Error("未选中卡片");
     }
 
-    return cards;
+    return {
+      orderedNodes,
+      selectedById,
+    };
+  }
+
+  function buildTreeChildren(parentNode, selectedById) {
+    return parentNode.childNoteIds.map(function (childNoteId) {
+      return selectedById[childNoteId] || null;
+    }).filter(Boolean).sort(compareByVisualOrder).map(function (childNode) {
+      return buildTreeNode(childNode, selectedById);
+    });
+  }
+
+  function buildTreeNode(node, selectedById) {
+    return {
+      note: node.note,
+      noteId: node.noteId,
+      selectionIndex: node.selectionIndex,
+      x: node.x,
+      y: node.y,
+      depth: 0,
+      children: buildTreeChildren(node, selectedById),
+    };
+  }
+
+  function assignDepth(node, depth) {
+    node.depth = depth;
+    node.children.forEach(function (child) {
+      assignDepth(child, depth + 1);
+    });
+  }
+
+  function getTreeRoots(orderedNodes, selectedById) {
+    const roots = orderedNodes.filter(function (node) {
+      return !node.parentNoteId || !selectedById[node.parentNoteId];
+    }).map(function (node) {
+      return buildTreeNode(node, selectedById);
+    });
+
+    roots.forEach(function (root) {
+      assignDepth(root, 0);
+    });
+
+    return roots;
+  }
+
+  function flattenTreeNodes(roots) {
+    const result = [];
+
+    function visit(node) {
+      result.push(node);
+      node.children.forEach(visit);
+    }
+
+    roots.forEach(visit);
+    return result;
+  }
+
+  function getSelectedCards(context) {
+    const items = arrayFromNSArray(getSelectedViews(context));
+    const indexed = indexSelectedNodes(items);
+    const roots = getTreeRoots(indexed.orderedNodes, indexed.selectedById);
+    const flatCards = indexed.orderedNodes.map(function (node) {
+      return {
+        note: node.note,
+        noteId: node.noteId,
+        selectionIndex: node.selectionIndex,
+        x: node.x,
+        y: node.y,
+        depth: 0,
+        children: [],
+      };
+    });
+
+    return {
+      flatCards,
+      treeRoots: roots,
+      treeCards: flattenTreeNodes(roots),
+    };
   }
 
   return {
     getSelectedCards,
+    arrayFromNSArray,
   };
 })();

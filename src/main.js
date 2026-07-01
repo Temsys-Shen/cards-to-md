@@ -1,4 +1,5 @@
 JSB.require("WebDevServerConfig");
+JSB.require("AddonPreferencesService");
 JSB.require("CardSelectionService");
 JSB.require("MarkdownExportService");
 JSB.require("ExportFileService");

@@ -39,6 +39,15 @@ var __MN_EXPORT_FILE_SERVICE_MNCardsToMDAddon = (function () {
     }
   }
 
+  function parentDirectory(path) {
+    const normalized = String(path || "").replace(/\/+$/g, "");
+    const index = normalized.lastIndexOf("/");
+    if (index <= 0) {
+      throw new Error(`Invalid path: ${path}`);
+    }
+    return normalized.slice(0, index);
+  }
+
   function writeTextFile(path, text) {
     const data = NSData.dataWithStringEncoding(text, 4);
     const written = data.writeToFileAtomically(path, true);
@@ -71,20 +80,23 @@ var __MN_EXPORT_FILE_SERVICE_MNCardsToMDAddon = (function () {
   }
 
   function createZipFile(zipPath, sourceDir) {
+    console.log(`[Export] createZipFile start: zipPath=${zipPath}, sourceDir=${sourceDir}`);
     const created = ZipArchive.createZipFileAtPathWithContentsOfDirectory(zipPath, sourceDir);
     if (!created) {
       throw new Error(`Failed to create zip export: zipPath=${zipPath}, sourceDir=${sourceDir}`);
     }
+    console.log(`[Export] createZipFile end: zipPath=${zipPath}`);
   }
 
   function createExport(markdownResult) {
     const app = Application.sharedInstance();
     const timestamp = buildTimestamp();
     const exportDir = `${app.documentPath}/${EXPORT_ROOT_NAME}/exports/${timestamp}`;
-    const assetDir = `${exportDir}/assets`;
+    const assetDir = `${exportDir}/${markdownResult.options.attachmentFolderName}`;
     const markdownPath = `${exportDir}/${sanitizeFileBaseName(markdownResult.fileBaseName)}-${timestamp}.md`;
     const zipPath = `${app.documentPath}/${EXPORT_ROOT_NAME}/exports/${sanitizeFileBaseName(markdownResult.fileBaseName)}-${timestamp}.zip`;
 
+    ensureDirectory(parentDirectory(markdownPath));
     ensureDirectory(assetDir);
     markdownResult.assets.forEach(function (asset) {
       writeAsset(asset, assetDir);
@@ -102,8 +114,11 @@ var __MN_EXPORT_FILE_SERVICE_MNCardsToMDAddon = (function () {
   }
 
   function saveExport(markdownResult) {
+    console.log("[Export] saveExport start");
     const result = createExport(markdownResult);
+    console.log(`[Export] saveFileWithUti start: zipPath=${result.zipPath}`);
     Application.sharedInstance().saveFileWithUti(result.zipPath, ZIP_UTI);
+    console.log(`[Export] saveFileWithUti end: zipPath=${result.zipPath}`);
     return result;
   }
 

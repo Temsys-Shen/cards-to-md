@@ -26,9 +26,27 @@ var __MN_WEB_BRIDGE_COMMANDS_MNCardsToMDAddon = (function () {
     };
   }
 
-  function buildSelectedCardsMarkdown(context) {
-    const cards = __MN_CARD_SELECTION_SERVICE_MNCardsToMDAddon.getSelectedCards(context);
-    return __MN_MARKDOWN_EXPORT_SERVICE_MNCardsToMDAddon.buildMarkdown(cards, context.payload);
+  function getExportPreferences() {
+    return {
+      attachmentFolderName: __MN_ADDON_PREFERENCES_SERVICE_MNCardsToMDAddon.getAttachmentFolderName(),
+    };
+  }
+
+  function setExportPreferences(context, payload) {
+    if (!payload || typeof payload !== "object") {
+      throw new Error("偏好设置参数缺失");
+    }
+
+    return {
+      attachmentFolderName: __MN_ADDON_PREFERENCES_SERVICE_MNCardsToMDAddon.setAttachmentFolderName(
+        payload.attachmentFolderName,
+      ),
+    };
+  }
+
+  function buildSelectedCardsMarkdown(context, payload) {
+    const selection = __MN_CARD_SELECTION_SERVICE_MNCardsToMDAddon.getSelectedCards(context);
+    return __MN_MARKDOWN_EXPORT_SERVICE_MNCardsToMDAddon.buildMarkdown(selection, payload);
   }
 
   function optionsKey(payload) {
@@ -36,11 +54,21 @@ var __MN_WEB_BRIDGE_COMMANDS_MNCardsToMDAddon = (function () {
   }
 
   function previewSelectedCardsMarkdown(context, payload) {
-    context.payload = payload || {};
-    const result = buildSelectedCardsMarkdown(context);
+    const normalizedPayload = payload || {};
+    const savedAttachmentFolderName = __MN_ADDON_PREFERENCES_SERVICE_MNCardsToMDAddon.setAttachmentFolderName(
+      normalizedPayload.attachmentFolderName,
+    );
+    const finalPayload = {
+      includeImages: normalizedPayload.includeImages,
+      includeCardLinks: normalizedPayload.includeCardLinks,
+      excerptStyle: normalizedPayload.excerptStyle,
+      mode: normalizedPayload.mode,
+      attachmentFolderName: savedAttachmentFolderName,
+    };
+    const result = buildSelectedCardsMarkdown(context, finalPayload);
     if (context.addon) {
       context.addon._cardsToMDPreviewSnapshot = {
-        optionsKey: optionsKey(payload),
+        optionsKey: optionsKey(finalPayload),
         result,
       };
     }
@@ -49,12 +77,15 @@ var __MN_WEB_BRIDGE_COMMANDS_MNCardsToMDAddon = (function () {
       noteCount: result.noteCount,
       imageCount: result.imageCount,
       fileBaseName: result.fileBaseName,
+      mode: result.mode,
+      attachmentFolderName: result.options.attachmentFolderName,
       warnings: result.warnings,
     };
   }
 
   function saveMarkdownExport(context, payload) {
-    const currentOptionsKey = optionsKey(payload);
+    const normalizedPayload = payload || {};
+    const currentOptionsKey = optionsKey(normalizedPayload);
     const snapshot = context.addon ? context.addon._cardsToMDPreviewSnapshot : null;
     if (!snapshot) {
       throw new Error("请先刷新预览");
@@ -63,13 +94,23 @@ var __MN_WEB_BRIDGE_COMMANDS_MNCardsToMDAddon = (function () {
       throw new Error("导出选项已改变，请重新刷新预览");
     }
 
-    return __MN_EXPORT_FILE_SERVICE_MNCardsToMDAddon.saveExport(snapshot.result);
+    const result = __MN_EXPORT_FILE_SERVICE_MNCardsToMDAddon.saveExport(snapshot.result);
+    return {
+      markdownPath: result.markdownPath,
+      assetDir: result.assetDir,
+      zipPath: result.zipPath,
+      noteCount: result.noteCount,
+      imageCount: result.imageCount,
+      closePanelAfterResponse: true,
+    };
   }
 
   const commands = {
     ping,
     echo,
     closePanel,
+    getExportPreferences,
+    setExportPreferences,
     previewSelectedCardsMarkdown,
     saveMarkdownExport,
   };

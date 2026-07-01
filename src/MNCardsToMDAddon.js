@@ -2,7 +2,10 @@ function createMNCardsToMDAddon(mainPath) {
   return JSB.defineClass("MNCardsToMDAddon : JSExtension", {
     sceneWillConnect: function () {
       self.mainPath = mainPath;
-      self.webController = __MN_WEB_API_MNCardsToMDAddon.createController(mainPath, self);
+      self.webController = __MN_WEB_API_MNCardsToMDAddon.createController(
+        mainPath,
+        self,
+      );
 
       self.layoutViewController = function () {
         __MN_WEB_API_MNCardsToMDAddon.ensureLayout(self.webController);
@@ -12,7 +15,11 @@ function createMNCardsToMDAddon(mainPath) {
     },
 
     sceneDidDisconnect: function () {
-      if (self.webController && self.webController.view && self.webController.view.superview) {
+      if (
+        self.webController &&
+        self.webController.view &&
+        self.webController.view.superview
+      ) {
         self.webController.view.removeFromSuperview();
       }
       self.webController = null;
@@ -34,7 +41,9 @@ function createMNCardsToMDAddon(mainPath) {
     },
 
     controllerWillLayoutSubviews: function (controller) {
-      if (controller === Application.sharedInstance().studyController(self.window)) {
+      if (
+        controller === Application.sharedInstance().studyController(self.window)
+      ) {
         self.layoutViewController();
       }
     },
@@ -67,7 +76,9 @@ function createMNCardsToMDAddon(mainPath) {
         self.layoutViewController();
       }
 
-      Application.sharedInstance().studyController(self.window).refreshAddonCommands();
+      Application.sharedInstance()
+        .studyController(self.window)
+        .refreshAddonCommands();
     },
   });
 }
