@@ -11,6 +11,18 @@ const modeOptions = [
   { label: "tree", value: "tree" },
 ];
 
+const scopeOptions = [
+  { label: "学习集", value: "notebook" },
+  { label: "脑图", value: "mindmap" },
+  { label: "卡片树", value: "card-tree" },
+  { label: "所选卡片", value: "selection" },
+];
+
+function getScopeLabel(scope) {
+  const option = scopeOptions.find((item) => item.value === scope);
+  return option ? option.label : "所选卡片";
+}
+
 function normalizeBridgeError(error) {
   if (!error) return "Unknown bridge error";
   if (typeof error === "string") return error;
@@ -115,6 +127,8 @@ function HomePage() {
   const [includeCardLinks, setIncludeCardLinks] = useState(false);
   const [excerptStyle, setExcerptStyle] = useState("quote");
   const [mode, setMode] = useState("flat");
+  const [scope, setScope] = useState("selection");
+  const [scopeTitle, setScopeTitle] = useState("所选卡片");
   const [attachmentFolderName, setAttachmentFolderName] = useState("assets");
   const [previewReady, setPreviewReady] = useState(false);
   const [warnings, setWarnings] = useState([]);
@@ -159,6 +173,7 @@ function HomePage() {
     includeCardLinks,
     excerptStyle,
     mode,
+    scope,
     attachmentFolderName,
     ...overrides,
   });
@@ -177,7 +192,7 @@ function HomePage() {
     try {
       setLoading(true);
       setPreviewReady(false);
-      setStatus("正在读取选中卡片...");
+      setStatus(`正在读取${getScopeLabel(nextOptions.scope)}...`);
       const result = await MNBridge.send("previewSelectedCardsMarkdown", nextOptions);
       if (requestId !== previewRequestIdRef.current) return;
       setMarkdown(result.markdown || "");
@@ -185,11 +200,13 @@ function HomePage() {
       setImageCount(result.imageCount || 0);
       setWarnings(Array.isArray(result.warnings) ? result.warnings : []);
       setPreviewReady(true);
+      const nextScopeTitle = result.scopeTitle || getScopeLabel(nextOptions.scope);
+      setScopeTitle(nextScopeTitle);
       if (typeof result.attachmentFolderName === "string" && result.attachmentFolderName.length > 0) {
         setAttachmentFolderName(result.attachmentFolderName);
       }
       setStatus(
-        `当前预览已更新。模式:${result.mode || nextOptions.mode}，附件目录:${result.attachmentFolderName || nextOptions.attachmentFolderName}`,
+        `${nextScopeTitle}，${result.noteCount || 0}卡，${result.imageCount || 0}图。模式:${result.mode || nextOptions.mode}，附件目录:${result.attachmentFolderName || nextOptions.attachmentFolderName}`,
       );
     } catch (error) {
       if (requestId !== previewRequestIdRef.current) return;
@@ -214,6 +231,8 @@ function HomePage() {
     setIncludeCardLinks(nextOptions.includeCardLinks);
     setExcerptStyle(nextOptions.excerptStyle);
     setMode(nextOptions.mode);
+    setScope(nextOptions.scope);
+    setScopeTitle(getScopeLabel(nextOptions.scope));
     setAttachmentFolderName(nextOptions.attachmentFolderName);
   };
 
@@ -292,6 +311,14 @@ function HomePage() {
 
   return (
     <section className="export-panel">
+      <div className="scope-rail">
+        <SegmentControl
+          label="导出范围"
+          onChange={(nextScope) => updateOptionsAndPreview({ scope: nextScope })}
+          options={scopeOptions}
+          value={scope}
+        />
+      </div>
       <div className="top-rail">
         <ToolToggle
           icon={<ImageIcon />}
@@ -374,7 +401,7 @@ function HomePage() {
           title={status}
           type="button"
         >
-          {noteCount}卡/{imageCount}图/{mode}/警告{warnings.length}
+          {scopeTitle}/{noteCount}卡/{imageCount}图/{mode}/警告{warnings.length}
         </button>
         <div className="status-message" title={status}>
           {status}

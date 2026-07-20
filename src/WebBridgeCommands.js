@@ -44,13 +44,19 @@ var __MN_WEB_BRIDGE_COMMANDS_MNCardsToMDAddon = (function () {
     };
   }
 
-  function buildSelectedCardsMarkdown(context, payload) {
-    const selection = __MN_CARD_SELECTION_SERVICE_MNCardsToMDAddon.getSelectedCards(context);
-    return __MN_MARKDOWN_EXPORT_SERVICE_MNCardsToMDAddon.buildMarkdown(selection, payload);
+  function buildScopedMarkdown(context, payload) {
+    const scopeResult = __MN_CARD_SELECTION_SERVICE_MNCardsToMDAddon.getScopeSelection(context, payload && payload.scope);
+    return {
+      scopeResult,
+      result: __MN_MARKDOWN_EXPORT_SERVICE_MNCardsToMDAddon.buildMarkdown(scopeResult.selection, payload),
+    };
   }
 
   function optionsKey(payload) {
-    return JSON.stringify(__MN_MARKDOWN_EXPORT_SERVICE_MNCardsToMDAddon.normalizeOptions(payload));
+    return JSON.stringify({
+      scope: __MN_CARD_SELECTION_SERVICE_MNCardsToMDAddon.normalizeScope(payload && payload.scope),
+      options: __MN_MARKDOWN_EXPORT_SERVICE_MNCardsToMDAddon.normalizeOptions(payload),
+    });
   }
 
   function previewSelectedCardsMarkdown(context, payload) {
@@ -64,8 +70,11 @@ var __MN_WEB_BRIDGE_COMMANDS_MNCardsToMDAddon = (function () {
       excerptStyle: normalizedPayload.excerptStyle,
       mode: normalizedPayload.mode,
       attachmentFolderName: savedAttachmentFolderName,
+      scope: normalizedPayload.scope,
     };
-    const result = buildSelectedCardsMarkdown(context, finalPayload);
+    const built = buildScopedMarkdown(context, finalPayload);
+    const scopeResult = built.scopeResult;
+    const result = built.result;
     if (context.addon) {
       context.addon._cardsToMDPreviewSnapshot = {
         optionsKey: optionsKey(finalPayload),
@@ -79,6 +88,8 @@ var __MN_WEB_BRIDGE_COMMANDS_MNCardsToMDAddon = (function () {
       fileBaseName: result.fileBaseName,
       mode: result.mode,
       attachmentFolderName: result.options.attachmentFolderName,
+      scope: scopeResult.scope,
+      scopeTitle: scopeResult.title,
       warnings: result.warnings,
     };
   }

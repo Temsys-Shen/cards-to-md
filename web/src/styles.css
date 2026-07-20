@@ -87,6 +87,25 @@ textarea:focus-visible {
   padding: 0 2px;
 }
 
+.scope-rail {
+  min-width: 0;
+  display: flex;
+  padding: 0 2px;
+}
+
+.scope-rail .control-group,
+.scope-rail .segment-control {
+  width: 100%;
+}
+
+.scope-rail .segment-control {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.scope-rail .segment-button {
+  min-width: 0;
+}
+
 .tool-toggle,
 .segment-button,
 .text-input,
