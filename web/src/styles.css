@@ -109,7 +109,6 @@ textarea:focus-visible {
 .tool-toggle,
 .segment-button,
 .text-input,
-.status-summary-button,
 .status-action {
   height: 28px;
   border: 1px solid var(--line-strong);
@@ -127,14 +126,12 @@ textarea:focus-visible {
 
 .tool-toggle,
 .segment-button,
-.status-summary-button,
 .status-action {
   cursor: pointer;
 }
 
 .tool-toggle:hover:not(:disabled),
 .segment-button:hover,
-.status-summary-button:hover,
 .status-action:hover:not(:disabled),
 .text-input:hover {
   border-color: #a7afbd;
@@ -283,7 +280,7 @@ textarea:focus-visible {
   background: rgba(255, 255, 255, 0.98);
 }
 
-.status-line,
+.status-error,
 .status-warning {
   min-width: 0;
   padding: 0;
@@ -294,8 +291,8 @@ textarea:focus-visible {
   overflow-wrap: anywhere;
 }
 
-.status-line {
-  color: var(--muted);
+.status-error {
+  color: var(--ink);
 }
 
 .status-warning {
@@ -316,34 +313,54 @@ textarea:focus-visible {
   background: var(--statusbar-bg);
 }
 
-.status-summary-button {
-  flex: 0 0 auto;
-  max-width: 220px;
-  padding: 0 8px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.status-summary-button[aria-expanded="true"] {
-  color: var(--ink);
-  background: var(--control-hover);
-}
-
-.status-summary-button[data-has-warnings="true"] {
-  border-color: #e3c277;
-  color: #5d3d00;
+.status-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 
 .status-message {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
   overflow: hidden;
   color: var(--subtle);
+  background: transparent;
   font-size: 12px;
   line-height: 1.2;
+  text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.status-message-button,
+.status-warning-button {
+  cursor: pointer;
+}
+
+.status-message-button:hover {
+  color: var(--ink);
+}
+
+.status-warning-button {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: var(--warning);
+  background: transparent;
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.status-warning-button:hover,
+.status-warning-button[aria-expanded="true"] {
+  color: #5d3d00;
 }
 
 .status-actions {
@@ -396,14 +413,6 @@ textarea:focus-visible {
 }
 
 @media (max-width: 430px) {
-  .status-message {
-    display: none;
-  }
-
-  .status-summary-button {
-    max-width: 170px;
-  }
-
   .status-action span {
     display: none;
   }

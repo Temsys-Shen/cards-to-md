@@ -7,8 +7,8 @@ const excerptStyleOptions = [
 ];
 
 const modeOptions = [
-  { label: "flat", value: "flat" },
-  { label: "tree", value: "tree" },
+  { label: "平铺", value: "flat" },
+  { label: "树形", value: "tree" },
 ];
 
 const scopeOptions = [
@@ -119,8 +119,6 @@ function StatusActionButton({ children, disabled, icon, onClick, primary }) {
 
 function HomePage() {
   const [markdown, setMarkdown] = useState("");
-  const [noteCount, setNoteCount] = useState(0);
-  const [imageCount, setImageCount] = useState(0);
   const [status, setStatus] = useState("在脑图中选中卡片后刷新预览。");
   const [loading, setLoading] = useState(false);
   const [includeImages, setIncludeImages] = useState(true);
@@ -128,11 +126,11 @@ function HomePage() {
   const [excerptStyle, setExcerptStyle] = useState("quote");
   const [mode, setMode] = useState("flat");
   const [scope, setScope] = useState("selection");
-  const [scopeTitle, setScopeTitle] = useState("所选卡片");
   const [attachmentFolderName, setAttachmentFolderName] = useState("assets");
   const [previewReady, setPreviewReady] = useState(false);
   const [warnings, setWarnings] = useState([]);
   const [statusOpen, setStatusOpen] = useState(false);
+  const [statusIsError, setStatusIsError] = useState(false);
   const attachmentPreviewTimerRef = useRef(null);
   const previewRequestIdRef = useRef(0);
 
@@ -148,6 +146,8 @@ function HomePage() {
         }
       } catch (error) {
         if (!alive) return;
+        setStatusIsError(true);
+        setStatusOpen(true);
         setStatus(normalizeBridgeError(error));
       }
     }
@@ -192,26 +192,25 @@ function HomePage() {
     try {
       setLoading(true);
       setPreviewReady(false);
+      setWarnings([]);
+      setStatusIsError(false);
+      setStatusOpen(false);
       setStatus(`正在读取${getScopeLabel(nextOptions.scope)}...`);
       const result = await MNBridge.send("previewSelectedCardsMarkdown", nextOptions);
       if (requestId !== previewRequestIdRef.current) return;
       setMarkdown(result.markdown || "");
-      setNoteCount(result.noteCount || 0);
-      setImageCount(result.imageCount || 0);
       setWarnings(Array.isArray(result.warnings) ? result.warnings : []);
       setPreviewReady(true);
       const nextScopeTitle = result.scopeTitle || getScopeLabel(nextOptions.scope);
-      setScopeTitle(nextScopeTitle);
       if (typeof result.attachmentFolderName === "string" && result.attachmentFolderName.length > 0) {
         setAttachmentFolderName(result.attachmentFolderName);
       }
-      setStatus(
-        `${nextScopeTitle}，${result.noteCount || 0}卡，${result.imageCount || 0}图。模式:${result.mode || nextOptions.mode}，附件目录:${result.attachmentFolderName || nextOptions.attachmentFolderName}`,
-      );
+      setStatus(`${nextScopeTitle}·${result.noteCount || 0}卡·${result.imageCount || 0}图`);
     } catch (error) {
       if (requestId !== previewRequestIdRef.current) return;
       setPreviewReady(false);
       setWarnings([]);
+      setStatusIsError(true);
       setStatusOpen(true);
       setStatus(normalizeBridgeError(error));
     } finally {
@@ -232,7 +231,6 @@ function HomePage() {
     setExcerptStyle(nextOptions.excerptStyle);
     setMode(nextOptions.mode);
     setScope(nextOptions.scope);
-    setScopeTitle(getScopeLabel(nextOptions.scope));
     setAttachmentFolderName(nextOptions.attachmentFolderName);
   };
 
@@ -249,6 +247,9 @@ function HomePage() {
     });
     setAttachmentFolderName(nextAttachmentFolderName);
     setPreviewReady(false);
+    setWarnings([]);
+    setStatusIsError(false);
+    setStatusOpen(false);
     setStatus("正在更新预览...");
     clearAttachmentPreviewTimer();
     attachmentPreviewTimerRef.current = setTimeout(() => {
@@ -260,10 +261,11 @@ function HomePage() {
   const save = async () => {
     try {
       setLoading(true);
+      setWarnings([]);
+      setStatusIsError(false);
+      setStatusOpen(false);
       setStatus("正在保存ZIP...");
       const result = await MNBridge.send("saveMarkdownExport", buildOptions());
-      setNoteCount(result.noteCount || 0);
-      setImageCount(result.imageCount || 0);
       setPreviewReady(false);
       setWarnings([]);
       setStatus(`已保存：${result.zipPath}`);
@@ -273,6 +275,7 @@ function HomePage() {
     } catch (error) {
       setPreviewReady(false);
       setWarnings([]);
+      setStatusIsError(true);
       setStatusOpen(true);
       setStatus(normalizeBridgeError(error));
     } finally {
@@ -300,6 +303,8 @@ function HomePage() {
       }
     } catch (error) {
       setPreviewReady(false);
+      setWarnings([]);
+      setStatusIsError(true);
       setStatusOpen(true);
       setStatus(normalizeBridgeError(error));
     }
@@ -308,6 +313,8 @@ function HomePage() {
   const toggleStatusOpen = () => {
     setStatusOpen((current) => !current);
   };
+
+  const hasStatusDetails = statusIsError || warnings.length > 0;
 
   return (
     <section className="export-panel">
@@ -380,9 +387,9 @@ function HomePage() {
           spellCheck={false}
           value={markdown}
         />
-        {statusOpen ? (
+        {statusOpen && hasStatusDetails ? (
           <div className="status-drawer" id="export-status-panel" role="status">
-            <div className="status-line">{status}</div>
+            {statusIsError ? <div className="status-error">{status}</div> : null}
             {warnings.map((warning) => (
               <div className="status-warning" key={warning}>
                 {warning}
@@ -392,19 +399,35 @@ function HomePage() {
         ) : null}
       </div>
       <div className="bottom-status-bar">
-        <button
-          aria-controls="export-status-panel"
-          aria-expanded={statusOpen}
-          className="status-summary-button"
-          data-has-warnings={warnings.length > 0 ? "true" : "false"}
-          onClick={toggleStatusOpen}
-          title={status}
-          type="button"
-        >
-          {scopeTitle}/{noteCount}卡/{imageCount}图/{mode}/警告{warnings.length}
-        </button>
-        <div className="status-message" title={status}>
-          {status}
+        <div className="status-content">
+          {statusIsError ? (
+            <button
+              aria-controls="export-status-panel"
+              aria-expanded={statusOpen}
+              className="status-message status-message-button"
+              onClick={toggleStatusOpen}
+              title={status}
+              type="button"
+            >
+              {status}
+            </button>
+          ) : (
+            <div className="status-message" title={status}>
+              {status}
+            </div>
+          )}
+          {warnings.length > 0 ? (
+            <button
+              aria-controls="export-status-panel"
+              aria-expanded={statusOpen}
+              className="status-warning-button"
+              onClick={toggleStatusOpen}
+              title={`${warnings.length}条警告，点击查看`}
+              type="button"
+            >
+              ·{warnings.length}条警告
+            </button>
+          ) : null}
         </div>
         <div className="status-actions">
           <StatusActionButton disabled={loading} icon={<RefreshIcon />} onClick={preview}>
