@@ -1,5 +1,6 @@
 var __MN_CARD_CONTENT_SERVICE_MNCardsToMDAddon = (function () {
   var MARKDOWN_IMAGE_PATTERN = /!\[([^\]]*)\]\(marginnote4app:\/\/markdownimg\/(png|jpeg)\/([^\s)]+)\)/g;
+  var convertHtml = __MN_HTML_COMPATIBILITY_SERVICE_MNCardsToMDAddon.convertHtml;
 
   function arrayFromNSArray(value) {
     return __MN_CARD_SELECTION_SERVICE_MNCardsToMDAddon.arrayFromNSArray(value);
@@ -139,8 +140,7 @@ var __MN_CARD_CONTENT_SERVICE_MNCardsToMDAddon = (function () {
         return;
       }
       if (type === "HtmlNote") {
-        var html = normalizeText(comment.html);
-        if (!html) throw new Error("HtmlNote缺少html: noteId=" + noteId + ", commentIndex=" + commentIndex);
+        var html = convertHtml(comment.html, { noteId: noteId, commentIndex: commentIndex });
         items.push({ type: "text", format: "html", text: html, source: "htmlComment", commentIndex: commentIndex, excerpt: false });
         return;
       }

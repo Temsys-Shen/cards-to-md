@@ -44,6 +44,7 @@ function createRuntime(mediaById = {}, sketchByKey = {}) {
   });
   loadSource(context, "src/FreehandStrokeService.js");
   loadSource(context, "src/InkDrawingService.js");
+  loadSource(context, "src/HtmlCompatibilityService.js");
   loadSource(context, "src/CardContentService.js");
   loadSource(context, "src/MarkdownExportService.js");
   return {
