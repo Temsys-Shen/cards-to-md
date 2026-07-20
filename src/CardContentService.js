@@ -26,6 +26,40 @@ var __MN_CARD_CONTENT_SERVICE_MNCardsToMDAddon = (function () {
     return { type: "image", source: source, commentIndex: commentIndex, sequence: sequence, mediaId: mediaId, extension: extension, alt: alt || "" };
   }
 
+  function createDrawingItem(noteId, source, commentIndex, sequence, drawingId, alt) {
+    var drawingData = assertMediaAvailable(noteId, source, commentIndex, drawingId);
+    var drawingBase64 = drawingData.base64Encoding();
+    if (!drawingBase64 || typeof drawingBase64 !== "string") {
+      throw new Error(
+        "手写媒体无效: noteId=" + noteId +
+        ", source=" + source +
+        ", commentIndex=" + commentIndex +
+        ", mediaId=" + drawingId,
+      );
+    }
+    try {
+      var rendered = __MN_INK_DRAWING_SERVICE_MNCardsToMDAddon.renderDrawingSvg(drawingBase64);
+      return {
+        type: "image",
+        source: source,
+        commentIndex: commentIndex,
+        sequence: sequence,
+        mediaId: drawingId,
+        extension: "svg",
+        alt: alt || "",
+        svg: rendered.svg,
+      };
+    } catch (error) {
+      throw new Error(
+        "手写解析失败: noteId=" + noteId +
+        ", source=" + source +
+        ", commentIndex=" + commentIndex +
+        ", mediaId=" + drawingId +
+        ", error=" + String(error),
+      );
+    }
+  }
+
   function parseTextItems(noteId, text, markdown, source, commentIndex, excerpt, includeImages) {
     var normalized = normalizeText(text);
     if (!normalized) return [];
@@ -114,14 +148,34 @@ var __MN_CARD_CONTENT_SERVICE_MNCardsToMDAddon = (function () {
         var linkImage = comment.q_hpic;
         var linkTextFirst = comment.textFirst === true || Number(comment.textFirst) === 1;
         if (linkImage && !linkTextFirst) {
-          if (includeImages) items.push(createImageItem(noteId, "linkNote", commentIndex, 0, normalizeText(linkImage.paint), "png", "linked excerpt"));
+          var linkPaintId = normalizeText(linkImage.paint);
+          var linkDrawingId = normalizeText(linkImage.drawing);
+          if (!linkPaintId && !linkDrawingId) {
+            throw new Error("LinkNote.q_hpic缺少paint和drawing: noteId=" + noteId + ", commentIndex=" + commentIndex);
+          }
+          if (includeImages && linkPaintId) {
+            items.push(createImageItem(noteId, "linkNote", commentIndex, 0, linkPaintId, "png", "linked excerpt"));
+          }
+          if (includeImages && linkDrawingId) {
+            items.push(createDrawingItem(noteId, "linkNoteDrawing", commentIndex, linkPaintId ? 1 : 0, linkDrawingId, "linked handwriting"));
+          }
           return;
         }
         items = items.concat(parseTextItems(noteId, comment.q_htext, isMarkdown(comment.markdown), "linkNote", commentIndex, false, includeImages));
         return;
       }
       if (type === "PaintNote") {
-        if (includeImages) items.push(createImageItem(noteId, "paintNote", commentIndex, 0, normalizeText(comment.paint), "png", "paint note"));
+        var paintId = normalizeText(comment.paint);
+        var drawingId = normalizeText(comment.drawing);
+        if (!paintId && !drawingId) {
+          throw new Error("PaintNote缺少paint和drawing: noteId=" + noteId + ", commentIndex=" + commentIndex);
+        }
+        if (includeImages && paintId) {
+          items.push(createImageItem(noteId, "paintNote", commentIndex, 0, paintId, "png", "paint note"));
+        }
+        if (includeImages && drawingId) {
+          items.push(createDrawingItem(noteId, "paintNoteDrawing", commentIndex, paintId ? 1 : 0, drawingId, "handwriting"));
+        }
         return;
       }
       unsupportedTypes.push(type);
