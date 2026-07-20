@@ -25,10 +25,6 @@ var __MN_EXPORT_FILE_SERVICE_MNCardsToMDAddon = (function () {
     return text.replace(/[^A-Za-z0-9._-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "") || "cards-to-md";
   }
 
-  function detectImageExtension(data) {
-    return "png";
-  }
-
   function ensureDirectory(path) {
     const fileManager = NSFileManager.defaultManager();
     if (fileManager.fileExistsAtPath(path)) return;
@@ -57,24 +53,24 @@ var __MN_EXPORT_FILE_SERVICE_MNCardsToMDAddon = (function () {
   }
 
   function writeAsset(asset, assetDir) {
-    const data = Database.sharedInstance().getMediaByHash(asset.paintHash);
-    if (!data) {
+    const assetPath = `${assetDir}/${asset.fileName}`;
+    if (!assetPath.endsWith(`.${asset.extension}`)) {
       throw new Error(
-        `PaintNote media not found: noteId=${asset.noteId}, commentIndex=${asset.commentIndex}, paintHash=${asset.paintHash}`,
+        `Asset extension mismatch: noteId=${asset.noteId}, source=${asset.source}, commentIndex=${asset.commentIndex}, extension=${asset.extension}, path=${assetPath}`,
       );
     }
-
-    const extension = detectImageExtension(data);
-    const assetPath = `${assetDir}/${asset.fileName}`;
-    if (!assetPath.endsWith(`.${extension}`)) {
+    const data = asset.kind === "svg"
+      ? NSData.dataWithStringEncoding(asset.svg, 4)
+      : Database.sharedInstance().getMediaByHash(asset.mediaId);
+    if (!data) {
       throw new Error(
-        `PaintNote asset extension mismatch: noteId=${asset.noteId}, commentIndex=${asset.commentIndex}, paintHash=${asset.paintHash}, extension=${extension}, path=${assetPath}`,
+        `Asset media not found: noteId=${asset.noteId}, source=${asset.source}, commentIndex=${asset.commentIndex}, mediaId=${asset.mediaId}`,
       );
     }
     const written = data.writeToFileAtomically(assetPath, true);
     if (!written) {
       throw new Error(
-        `Failed to write PaintNote media: noteId=${asset.noteId}, commentIndex=${asset.commentIndex}, paintHash=${asset.paintHash}, path=${assetPath}`,
+        `Failed to write asset: noteId=${asset.noteId}, source=${asset.source}, commentIndex=${asset.commentIndex}, path=${assetPath}`,
       );
     }
   }

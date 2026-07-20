@@ -1,6 +1,8 @@
 JSB.require("WebDevServerConfig");
 JSB.require("AddonPreferencesService");
 JSB.require("CardSelectionService");
+JSB.require("InkDrawingService");
+JSB.require("CardContentService");
 JSB.require("MarkdownExportService");
 JSB.require("ExportFileService");
 JSB.require("WebBridgeCommands");
