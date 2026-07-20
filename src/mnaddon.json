@@ -2,7 +2,7 @@
   "addonid": "marginnote.addon.cardstomd",
   "author": "Museday",
   "title": "Cards To MD",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "marginnote_version_min": "4.2.3",
   "cert_key": ""
 }
