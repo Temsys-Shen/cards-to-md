@@ -56,6 +56,10 @@ function selectionFor(note) {
   return { flatCards: [card], treeCards: [card] };
 }
 
+function selectionForCards(cards) {
+  return { flatCards: cards, treeCards: cards };
+}
+
 test("exports ordered rich content and external attachments", () => {
   const runtime = createRuntime({ excerpt: "ZXhjZXJwdA==", inline: "aW5saW5l", linked: "bGluaw==", paint: "cGFpbnQ=" });
   const note = {
@@ -127,6 +131,56 @@ test("renders independent mindmap handwriting as an SVG asset", () => {
   assert.equal(result.assets[0].kind, "svg");
   assert.match(result.assets[0].svg, /M 11\.00 22\.00 L 13\.00 24\.00/);
   assert.match(result.markdown, /n5-sketchDrawing-excerpt-0-drawing\.svg/);
+});
+
+test("renders 8-byte single-point handwriting and extended point records", () => {
+  const singlePoint = createInkArchive(8, [{ x: 5, y: 6 }]);
+  const singleRuntime = createRuntime({ singlePoint }, { "book:n-single": { comments: [{ drawing: "singlePoint" }] } });
+  const singleNote = { noteId: "n-single", noteTitle: "单点", notebookId: "book", comments: [] };
+  const singleResult = singleRuntime.context.__MN_MARKDOWN_EXPORT_SERVICE_MNCardsToMDAddon.buildMarkdown(selectionFor(singleNote), {});
+  assert.match(singleResult.assets[0].svg, /<circle cx="15\.00" cy="26\.00"/);
+
+  [12, 14, 48].forEach((pointStride) => {
+    const drawing = createInkArchive(pointStride);
+    const runtime = createRuntime({ drawing }, { [`book:n-${pointStride}`]: { comments: [{ drawing: "drawing" }] } });
+    const note = { noteId: `n-${pointStride}`, noteTitle: "扩展点", notebookId: "book", comments: [] };
+    const result = runtime.context.__MN_MARKDOWN_EXPORT_SERVICE_MNCardsToMDAddon.buildMarkdown(selectionFor(note), {});
+    assert.match(result.assets[0].svg, /M 11\.00 22\.00 L 13\.00 24\.00/);
+  });
+});
+
+test("rejects point records shorter than 8 bytes", () => {
+  const drawing = createInkArchive(7, [{ x: 1, y: 2 }]);
+  const runtime = createRuntime({ drawing }, { "book:n-short": { comments: [{ drawing: "drawing" }] } });
+  const note = { noteId: "n-short", noteTitle: "无效点", notebookId: "book", comments: [] };
+  assert.throws(
+    () => runtime.context.__MN_MARKDOWN_EXPORT_SERVICE_MNCardsToMDAddon.buildMarkdown(selectionFor(note), {}),
+    /脑图手写解析失败: noteId=n-short, mediaId=drawing, error=Error: invalid-point-stride/,
+  );
+});
+
+test("uses level-one card headings in flat mode and preserves tree depth", () => {
+  const runtime = createRuntime();
+  const first = { noteId: "first", noteTitle: "第一张", comments: [{ type: "TextNote", text: "# 内部标题", markdown: true }] };
+  const second = { noteId: "second", noteTitle: "第二张", comments: [] };
+  const flatCards = [
+    { note: first, noteId: first.noteId, depth: 0 },
+    { note: second, noteId: second.noteId, depth: 0 },
+  ];
+  const flatResult = runtime.context.__MN_MARKDOWN_EXPORT_SERVICE_MNCardsToMDAddon.buildMarkdown(selectionForCards(flatCards), { mode: "flat" });
+  assert.match(flatResult.markdown, /^# 第一张$/m);
+  assert.match(flatResult.markdown, /^## 内部标题$/m);
+  assert.match(flatResult.markdown, /^# 第二张$/m);
+  assert.doesNotMatch(flatResult.markdown, /^## 第二张$/m);
+
+  const treeCards = [
+    { note: first, noteId: first.noteId, depth: 0 },
+    { note: second, noteId: second.noteId, depth: 1 },
+  ];
+  const treeResult = runtime.context.__MN_MARKDOWN_EXPORT_SERVICE_MNCardsToMDAddon.buildMarkdown(selectionForCards(treeCards), { mode: "tree" });
+  assert.match(treeResult.markdown, /^# 第一张$/m);
+  assert.match(treeResult.markdown, /^## 内部标题$/m);
+  assert.match(treeResult.markdown, /^## 第二张$/m);
 });
 
 test("rejects malformed handwriting archives with the parser error", () => {

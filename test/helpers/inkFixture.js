@@ -26,13 +26,14 @@ function floatField(number, value) {
   return Buffer.concat([encodeVarint(number * 8 + 5), payload]);
 }
 
-function createInkArchive() {
-  const pointData = Buffer.alloc(24);
-  pointData.writeFloatLE(1, 0);
-  pointData.writeFloatLE(2, 4);
-  pointData.writeFloatLE(3, 12);
-  pointData.writeFloatLE(4, 16);
-  const strokeData = Buffer.concat([varintField(3, 2), bytesField(7, pointData)]);
+function createInkArchive(pointStride = 12, points = [{ x: 1, y: 2 }, { x: 3, y: 4 }]) {
+  const pointData = Buffer.alloc(pointStride * points.length);
+  points.forEach((point, index) => {
+    const offset = index * pointStride;
+    if (pointStride >= 4) pointData.writeFloatLE(point.x, offset);
+    if (pointStride >= 8) pointData.writeFloatLE(point.y, offset + 4);
+  });
+  const strokeData = Buffer.concat([varintField(3, points.length), bytesField(7, pointData)]);
   const transform = Buffer.concat([floatField(5, 10), floatField(6, 20)]);
   const stroke = Buffer.concat([bytesField(5, strokeData), bytesField(7, transform)]);
   return Buffer.concat([Buffer.from([119, 114, 100, 0, 0, 0]), bytesField(5, stroke)]).toString("base64");

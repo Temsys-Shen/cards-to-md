@@ -124,8 +124,8 @@ var __MN_MARKDOWN_EXPORT_SERVICE_MNCardsToMDAddon = (function () {
   function renderNote(card, assets, options, warnings) {
     const note = card.note;
     const content = __MN_CARD_CONTENT_SERVICE_MNCardsToMDAddon.parseNote(note, options);
-    const headingLevel = options.mode === "tree" ? card.depth + 1 : 2;
-    const contentHeadingBase = options.mode === "tree" ? headingLevel : 2;
+    const headingLevel = options.mode === "tree" ? card.depth + 1 : 1;
+    const contentHeadingBase = headingLevel;
     const lines = [`${headingPrefix(headingLevel, warnings)} ${normalizeText(note.noteTitle) || "Untitled Card"}`, ""];
     appendCardLink(lines, note, options);
     content.items.forEach(function (item) {

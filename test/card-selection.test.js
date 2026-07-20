@@ -97,15 +97,42 @@ test("mindmap exports every node without depending on selection", () => {
   assert.deepEqual(ids(selection.treeCards), ["root", "child"]);
 });
 
-test("notebook recursively preserves root and child order", () => {
+test("notebook rebuilds the tree from the complete card collection", () => {
+  const firstChild = note("first-child");
   const firstGrandchild = note("first-grandchild");
-  const first = note("first", [note("first-child"), firstGrandchild]);
-  const second = note("second", [note("second-child")]);
-  const result = createService({ notebookNotes: [first, second] }).getScopeSelection({}, "notebook");
+  const secondChild = note("second-child");
+  const first = note("first", [firstChild, firstGrandchild]);
+  const second = note("second", [secondChild]);
+  const result = createService({ notebookNotes: [first, firstChild, firstGrandchild, second, secondChild] }).getScopeSelection({}, "notebook");
   assert.equal(result.id, "book");
   assert.equal(result.title, "测试学习集");
   assert.deepEqual(ids(result.selection.treeCards), ["first", "first-child", "first-grandchild", "second", "second-child"]);
   assert.deepEqual(ids(result.selection.flatCards), ["first", "first-child", "first-grandchild", "second", "second-child"]);
+});
+
+test("notebook removes duplicate ids and duplicate child references", () => {
+  const child = note("child");
+  const root = note("root", [child, child]);
+  const duplicateChild = note("child");
+  const selection = createService({ notebookNotes: [root, child, duplicateChild] }).getScopeSelection({}, "notebook").selection;
+  assert.deepEqual(ids(selection.treeRoots), ["root"]);
+  assert.deepEqual(ids(selection.treeCards), ["root", "child"]);
+});
+
+test("notebook rejects missing children and multiple parents", () => {
+  const missing = note("missing");
+  assert.throws(
+    () => createService({ notebookNotes: [note("root", [missing])] }).getScopeSelection({}, "notebook"),
+    /学习集子卡片不在卡片集合中: missing/,
+  );
+
+  const child = note("child");
+  const first = note("first", [child]);
+  const second = note("second", [child]);
+  assert.throws(
+    () => createService({ notebookNotes: [first, second, child] }).getScopeSelection({}, "notebook"),
+    /学习集卡片存在多个上级: child/,
+  );
 });
 
 test("scope validation reports empty ranges and invalid hierarchies", () => {
@@ -127,7 +154,7 @@ test("scope validation reports empty ranges and invalid hierarchies", () => {
   const second = note("second");
   first.childNotes = [second];
   second.childNotes = [first];
-  assert.throws(() => createService({ notebookNotes: [first] }).getScopeSelection({}, "notebook"), /学习集卡片层级存在循环: first/);
+  assert.throws(() => createService({ notebookNotes: [first, second] }).getScopeSelection({}, "notebook"), /学习集卡片层级存在循环: first/);
 
   const root = node("root", 0, 0);
   const child = node("child", 10, 10);

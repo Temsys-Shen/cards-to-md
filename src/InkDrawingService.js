@@ -95,11 +95,11 @@ var __MN_INK_DRAWING_SERVICE_MNCardsToMDAddon = (function () {
     var view = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
     var pointCount = Number(declaredPointCount) > 0 ? Math.floor(Number(declaredPointCount)) : Math.floor(raw.length / 12);
     var pointStride = pointCount > 0 ? Math.floor(raw.length / pointCount) : 12;
-    if (pointStride < 12) throw new Error("invalid-point-stride");
+    if (pointStride < 8) throw new Error("invalid-point-stride");
     var points = [];
     for (var index = 0; index < pointCount; index += 1) {
       var offset = index * pointStride;
-      if (offset + 12 > raw.length) break;
+      if (offset + 8 > raw.length) break;
       points.push({ x: view.getFloat32(offset, true), y: view.getFloat32(offset + 4, true) });
     }
     return points;
